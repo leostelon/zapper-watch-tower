@@ -25,6 +25,9 @@ app.use(function (req, res, next) {
     next();
 });
 
+// Database
+import "./database/mongoose";
+
 app.use(controllers)
 
 
