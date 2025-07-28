@@ -8,16 +8,22 @@
     "prestart": "npm run build",
     "start": "node dist/index.js",
     "prestart:dev": "npm run build",
-    "start:dev": "ts-node-dev --respawn --transpile-only index.ts"
+    "start:dev": "ts-node-dev --respawn --transpile-only src/index.ts"
   },
   "keywords": [],
   "author": "leostelon",
   "license": "ISC",
   "devDependencies": {
+    "@types/express": "^5.0.3",
     "@types/node": "^20.14.11",
     "concurrently": "^8.2.2",
     "rimraf": "^6.0.1",
     "ts-node-dev": "^2.0.0",
     "typescript": "^5.5.3"
+  },
+  "dependencies": {
+    "bitcoinjs-lib": "^6.1.7",
+    "dotenv": "^17.2.1",
+    "express": "^5.1.0"
   }
 }
