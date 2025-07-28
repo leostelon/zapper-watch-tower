@@ -1,3 +1,2 @@
-const orderService = require("./order");
-
-module.exports = { orderService };
+export { OrderService } from "./order";
+export { QuoteService } from "./quote"
