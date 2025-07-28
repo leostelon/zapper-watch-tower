@@ -1,6 +1,7 @@
 import "dotenv/config"
 
 import express from "express";
+import { router as controllers } from "./controllers";
 const app = express()
 
 app.use(express.json());
@@ -23,6 +24,8 @@ app.use(function (req, res, next) {
     );
     next();
 });
+
+app.use(controllers)
 
 
 app.get("/", (req, res) => {
