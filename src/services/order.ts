@@ -1,14 +1,18 @@
 import { script, opcodes, payments } from "bitcoinjs-lib";
 import { NETWORK } from "../constants";
 import { Order, OrderModel } from "../models/Order";
+import { QuoteModel } from "../models/Quote";
 
 const network = NETWORK;
 
 export class OrderService {
-	public static async createOrder(secretHash: string, amount: bigint): Promise<Order> {
+	public static async createOrder(secretHash: string, quote_id: string): Promise<Order> {
+		const quote = await QuoteModel.findById(quote_id)
+		if (!quote) throw Error("No quote found");
+
 		const p2wshAddr = this.getP2WSHAddress(secretHash, "");
-		const order = new OrderModel({ secret_hash: secretHash, src_payment_address: p2wshAddr })
-		
+		const order = new OrderModel({ secret_hash: secretHash, src_escrow_address: p2wshAddr, quote_id })
+
 		return await order.save()
 	}
 
