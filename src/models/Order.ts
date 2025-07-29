@@ -1,11 +1,20 @@
 import mongoose, { Document } from "mongoose";
 import { QuoteModel } from "./Quote";
 
+export enum Status {
+    ADDRESS_CREATED = "ADDRESS_CREATED",
+    DEPOSIT_COMPLETE = "DEPOSIT_COMPLETE",
+    WITHDRAWN = "WITHDRAWN",
+    CANCELED = "CANCELED",
+}
+
 interface IOrder {
     secret_hash: string,
     src_escrow_address?: string,
     dst_escrow_address?: string,
-    quote_id: typeof QuoteModel
+    quote_id: typeof QuoteModel,
+    src_status: Status[],
+    dst_status: Status[],
 }
 
 export interface Order extends IOrder, Document { }
@@ -29,9 +38,18 @@ const OrderSchema = new mongoose.Schema<Order>({
     quote_id: {
         type: mongoose.Types.ObjectId,
         ref: QuoteModel,
-        require: true
+        required: true
+    },
+    src_status: {
+        type: [String],
+        enum: Object.values(Status),
+        default: []
+    },
+    dst_status: {
+        type: [String],
+        enum: Object.values(Status),
+        default: []
     }
-
 }, { timestamps: true })
 
 export const OrderModel = mongoose.model<Order>("Order", OrderSchema);

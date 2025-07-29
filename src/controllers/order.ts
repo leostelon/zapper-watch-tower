@@ -1,7 +1,6 @@
 import express from "express";
 import { OrderService } from "../services/order";
 import { CreateOrderReqTransformer } from "./transformers";
-import { OrderModel } from "../models/Order";
 export const router = express.Router();
 
 router.post("/", async (req, res) => {

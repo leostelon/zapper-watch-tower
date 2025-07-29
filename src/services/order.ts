@@ -1,18 +1,19 @@
 import { script, opcodes, payments } from "bitcoinjs-lib";
 import { NETWORK } from "../constants";
-import { Order, OrderModel } from "../models/Order";
+import { Order, OrderModel, Status } from "../models/Order";
 import { QuoteModel } from "../models/Quote";
+import { BitcoinMonitor } from "../unisat";
 
 const network = NETWORK;
 
 export class OrderService {
-	public static async createOrder(secretHash: string, quote_id: string): Promise<Order> {
+	public static async createOrder(secretHashHex: string, quote_id: string): Promise<Order> {
 		const quote = await QuoteModel.findById(quote_id)
 		if (!quote) throw Error("No quote found");
 
-		const p2wshAddr = this.getP2WSHAddress(secretHash, "");
-		const order = new OrderModel({ secret_hash: secretHash, src_escrow_address: p2wshAddr, quote_id })
-
+		const p2wshAddr = this.getP2WSHAddress(secretHashHex, "");
+		const order = new OrderModel({ secret_hash: secretHashHex, src_escrow_address: p2wshAddr, quote_id, src_status: [Status.ADDRESS_CREATED] })
+		BitcoinMonitor.instance.addAddress(order.id, p2wshAddr)
 		return await order.save()
 	}
 
@@ -30,11 +31,12 @@ export class OrderService {
 
 	private static getP2WSHAddress(hash: string, resolverRecipientAddress: string) {
 		// const resolverAddress = resolverRecipientAddress;
+		const secretHashBuffer = Buffer.from(hash, 'hex')
 		const resolverAddress = "tb1qkj2s9055xjpv3gmdff5xz3z3978uu8kfcqv7xu" as any;
 		const locking_script = script.compile([
-			opcodes.OP_1,
-			opcodes.OP_CHECKSEQUENCEVERIFY,
-			opcodes.OP_DROP,
+			opcodes.OP_HASH160,
+			secretHashBuffer,
+			opcodes.OP_EQUALVERIFY,
 			opcodes.OP_DUP,
 			opcodes.OP_HASH160,
 			resolverAddress,
