@@ -76,7 +76,13 @@
                 }
             ],
             "name": "deployDst",
-            "outputs": [],
+            "outputs": [
+                {
+                    "internalType": "address",
+                    "name": "",
+                    "type": "address"
+                }
+            ],
             "stateMutability": "nonpayable",
             "type": "function"
         },
@@ -109,6 +115,29 @@
                 }
             ],
             "name": "transferOwnership",
+            "outputs": [],
+            "stateMutability": "nonpayable",
+            "type": "function"
+        },
+        {
+            "inputs": [
+                {
+                    "internalType": "contract IEscrow",
+                    "name": "escrow",
+                    "type": "address"
+                },
+                {
+                    "internalType": "string",
+                    "name": "secret",
+                    "type": "string"
+                },
+                {
+                    "internalType": "address payable",
+                    "name": "_withdrawTo",
+                    "type": "address"
+                }
+            ],
+            "name": "withdraw",
             "outputs": [],
             "stateMutability": "nonpayable",
             "type": "function"
