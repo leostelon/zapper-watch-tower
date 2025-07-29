@@ -1,8 +1,8 @@
 import mongoose, { Document } from "mongoose";
 
 interface IQuote {
-    srcChainId: Number,
-    dstChainId: Number,
+    srcChainId: number,
+    dstChainId: number,
     srcTokenAddress: string,
     dstTokenAddress: string,
     srcTokenAmount: string,

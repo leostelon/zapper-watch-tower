@@ -45,9 +45,10 @@ export class BitcoinMonitor {
         job.start();
 
         // Auto-remove the job after 30 minutes (30 * 60 * 1000 ms)
-        const timeoutRef = setTimeout(() => {
+        const timeoutRef = setTimeout(async () => {
             console.log(`Auto-expired job for ${bitcoinAddress} after 30 minutes`);
             this.removeAddress(orderId);
+            await this.orderRepo.updateBitcoinSourceCancelStatus(orderId)
         }, 30 * 60 * 1000);
 
         this.watchedAddresses.set(id, { id, address: bitcoinAddress, job, orderId, timeoutRef });
