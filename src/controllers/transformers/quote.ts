@@ -8,4 +8,5 @@ export const GetQuoteReqTransformer = z.object({
     dstTokenAddress: z.string(),
     amount: z.string(),
     walletAddress: z.string(),
+    enableEstimate: z.boolean().default(false)
 });
