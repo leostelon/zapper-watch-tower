@@ -7,4 +7,11 @@ export class OrderRepository {
         order?.src_status.push(Status.DEPOSIT_COMPLETE)
         await order.save()
     }
+
+    async updateBitcoinSourceCancelStatus(orderId: string) {
+        const order = await OrderModel.findById(orderId);
+        if (!order) return;
+        order?.src_status.push(Status.CANCELED)
+        await order.save()
+    }
 }

@@ -3,6 +3,10 @@ import { NETWORK } from "../constants";
 import { Order, OrderModel, Status } from "../models/Order";
 import { QuoteModel } from "../models/Quote";
 import { BitcoinMonitor } from "../unisat";
+import { ethers } from 'ethers';
+import Resolver from '../contracts/abi/Resolver.json';
+import { config } from "../config";
+import { SupportedNetworks } from "../chains";
 
 const network = NETWORK;
 
@@ -11,8 +15,14 @@ export class OrderService {
 		const quote = await QuoteModel.findById(quote_id)
 		if (!quote) throw Error("No quote found");
 
-		const p2wshAddr = this.getP2WSHAddress(secretHashHex, "");
+		const chainConfig = config.chain[quote.dstChainId as SupportedNetworks];
+		if (!chainConfig || !chainConfig.resolver_btc_address) {
+			throw new Error(`resolver_btc_address missing for chain ID: ${quote.dstChainId}`);
+		}
+		const p2wshAddr = this.getP2WSHAddress(secretHashHex, chainConfig.resolver_btc_address);
+
 		const order = new OrderModel({ secret_hash: secretHashHex, src_escrow_address: p2wshAddr, quote_id, src_status: [Status.ADDRESS_CREATED] })
+		await this.deployDstEVMEscrow(quote.dstChainId, quote.dstTokenAddress, secretHashHex, quote.dstTokenAmount)
 		BitcoinMonitor.instance.addAddress(order.id, p2wshAddr)
 		return await order.save()
 	}
@@ -30,9 +40,8 @@ export class OrderService {
 	}
 
 	private static getP2WSHAddress(hash: string, resolverRecipientAddress: string) {
-		// const resolverAddress = resolverRecipientAddress;
+		const resolverAddress = resolverRecipientAddress as any;
 		const secretHashBuffer = Buffer.from(hash, 'hex')
-		const resolverAddress = "tb1qkj2s9055xjpv3gmdff5xz3z3978uu8kfcqv7xu" as any;
 		const locking_script = script.compile([
 			opcodes.OP_HASH160,
 			secretHashBuffer,
@@ -51,6 +60,24 @@ export class OrderService {
 
 		const p2wshAddr = p2wsh.address ?? "";
 		return p2wshAddr;
+	}
+
+	private static async deployDstEVMEscrow(dstChainId: SupportedNetworks, tokenAddress: string, secretHashHex: string, amount: string) {
+		const chainConfig = config.chain[dstChainId];
+		if (!chainConfig) throw Error("Chain not configured")
+		const provider = new ethers.JsonRpcProvider(chainConfig.testnet_url);
+		const wallet = new ethers.Wallet(chainConfig.resolver_private_key!, provider);
+
+		const resolver = new ethers.Contract(chainConfig.resolver_address, Resolver.abi, wallet);
+
+		const tx = await resolver.deployDst(
+			tokenAddress,
+			`0x${secretHashHex}`,
+			amount
+		);
+
+		await tx.wait();
+		console.log('Destination escrow deployed at:', tx.hash);
 	}
 }
 
