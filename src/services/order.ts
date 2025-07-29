@@ -7,6 +7,7 @@ import { ethers } from 'ethers';
 import Resolver from '../contracts/abi/Resolver.json';
 import { config } from "../config";
 import { SupportedNetworks } from "../chains";
+import { OrderRepository } from "../repositories";
 
 const network = NETWORK;
 
@@ -22,7 +23,7 @@ export class OrderService {
 		const p2wshAddr = this.getP2WSHAddress(secretHashHex, chainConfig.resolver_btc_address);
 
 		const order = new OrderModel({ secret_hash: secretHashHex, src_escrow_address: p2wshAddr, quote_id, src_status: [Status.ADDRESS_CREATED] })
-		await this.deployDstEVMEscrow(quote.dstChainId, quote.dstTokenAddress, secretHashHex, quote.dstTokenAmount)
+		await this.deployDstEVMEscrow(order.id, quote.dstChainId, quote.dstTokenAddress, secretHashHex, quote.dstTokenAmount)
 		BitcoinMonitor.instance.addAddress(order.id, p2wshAddr)
 		return await order.save()
 	}
@@ -62,7 +63,7 @@ export class OrderService {
 		return p2wshAddr;
 	}
 
-	private static async deployDstEVMEscrow(dstChainId: SupportedNetworks, tokenAddress: string, secretHashHex: string, amount: string) {
+	private static async deployDstEVMEscrow(orderId: string, dstChainId: SupportedNetworks, tokenAddress: string, secretHashHex: string, amount: string) {
 		const chainConfig = config.chain[dstChainId];
 		if (!chainConfig) throw Error("Chain not configured")
 		const provider = new ethers.JsonRpcProvider(chainConfig.testnet_url);
@@ -75,6 +76,9 @@ export class OrderService {
 			`0x${secretHashHex}`,
 			amount
 		);
+		const orderRepo = new OrderRepository();
+		await orderRepo.updateBitcoinDestinationStatus(orderId, Status.ADDRESS_CREATED);
+		await orderRepo.updateBitcoinDestinationStatus(orderId, Status.DEPOSIT_COMPLETE);
 
 		await tx.wait();
 		console.log('Destination escrow deployed at:', tx.hash);
