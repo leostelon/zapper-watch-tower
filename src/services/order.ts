@@ -16,6 +16,14 @@ export class OrderService {
 		return await order.save()
 	}
 
+	public static async getOrder(orderId: string): Promise<Order> {
+		const order = await OrderModel.findById(orderId)
+		if (!order) {
+			throw Error("Order not found")
+		}
+		return order
+	}
+
 	public static async cancelOrder() {
 		console.log("canceling order");
 	}
