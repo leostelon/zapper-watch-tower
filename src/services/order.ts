@@ -9,11 +9,15 @@ import ERC20 from '../contracts/abi/ERC20.json';
 import { config } from "../config";
 import { SupportedNetworks } from "../chains";
 import { OrderRepository } from "../repositories";
-
-const network = NETWORK;
+import { BitcoinLib } from "../lib/bitcoin";
 
 export class OrderService {
-	public static async createOrder(secretHashHex: string, quote_id: string): Promise<Order> {
+	private bitcoinLib: BitcoinLib;
+	constructor() {
+		this.bitcoinLib = new BitcoinLib()
+	}
+
+	public async createOrder(secretHashHex: string, quote_id: string): Promise<Order> {
 		const quote = await QuoteModel.findById(quote_id)
 		if (!quote) throw Error("No quote found");
 
@@ -21,7 +25,7 @@ export class OrderService {
 		if (!chainConfig || !chainConfig.resolver_btc_address) {
 			throw new Error(`resolver_btc_address missing for chain ID: ${quote.dstChainId}`);
 		}
-		const p2wshAddr = this.getP2WSHAddress(secretHashHex, chainConfig.resolver_btc_address);
+		const p2wshAddr = this.bitcoinLib.getP2WSHAddress(secretHashHex, chainConfig.resolver_btc_address);
 
 		const order = new OrderModel({ secret_hash: secretHashHex, src_escrow_address: p2wshAddr, quote_id, src_status: [Status.ADDRESS_CREATED] })
 		await this.deployDstEVMEscrow(order, quote.dstChainId, quote.dstTokenAddress, secretHashHex, quote.dstTokenAmount)
@@ -29,7 +33,7 @@ export class OrderService {
 		return await order.save()
 	}
 
-	public static async getOrder(orderId: string): Promise<Order> {
+	public async getOrder(orderId: string): Promise<Order> {
 		const order = await OrderModel.findById(orderId).populate("quote")
 		if (!order) {
 			throw Error("Order not found")
@@ -41,30 +45,7 @@ export class OrderService {
 		console.log("canceling order");
 	}
 
-	private static getP2WSHAddress(hash: string, resolverRecipientAddress: string) {
-		const resolverAddress = resolverRecipientAddress as any;
-		const secretHashBuffer = Buffer.from(hash, 'hex')
-		const locking_script = script.compile([
-			opcodes.OP_HASH160,
-			secretHashBuffer,
-			opcodes.OP_EQUALVERIFY,
-			opcodes.OP_DUP,
-			opcodes.OP_HASH160,
-			resolverAddress,
-			opcodes.OP_EQUALVERIFY,
-			opcodes.OP_CHECKSIG,
-		]);
-
-		const p2wsh = payments.p2wsh({
-			redeem: { output: locking_script, network },
-			network,
-		});
-
-		const p2wshAddr = p2wsh.address ?? "";
-		return p2wshAddr;
-	}
-
-	private static async deployDstEVMEscrow(order: Order, dstChainId: SupportedNetworks, tokenAddress: string, secretHashHex: string, amount: string) {
+	private async deployDstEVMEscrow(order: Order, dstChainId: SupportedNetworks, tokenAddress: string, secretHashHex: string, amount: string) {
 		const chainConfig = config.chain[dstChainId];
 		if (!chainConfig) throw Error("Chain not configured")
 		const provider = new ethers.JsonRpcProvider(chainConfig.testnet_url);
@@ -94,7 +75,7 @@ export class OrderService {
 		console.log('Destination escrow deployed at:', tx.hash);
 	}
 
-	private static async hasSufficientERC20Balance(
+	private async hasSufficientERC20Balance(
 		tokenAddress: string,
 		holderAddress: string,
 		minAmount: string,

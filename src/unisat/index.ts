@@ -29,7 +29,7 @@ export class BitcoinMonitor {
 
     private async checkBitcoinDeposit(address: string, orderId: string) {
         console.log(`[${new Date().toISOString()}] Checking balance for ${address}...`);
-        const utxo: any[] = await getUTXOs(address);
+        const utxo = await getUTXOs(address);
         if (utxo.length > 0) {
             this.removeAddress(orderId)
             await this.orderRepo.updateBitcoinSourceStatus(orderId, Status.DEPOSIT_COMPLETE)
