@@ -7,6 +7,7 @@ interface IQuote {
     dstTokenAddress: string,
     srcTokenAmount: string,
     dstTokenAmount: string,
+    walletAddress: string,
 }
 
 export interface Quote extends IQuote, Document { }
@@ -33,6 +34,10 @@ const QuoteSchema = new mongoose.Schema<Quote>({
         required: true,
     },
     dstTokenAmount: {
+        type: String,
+        required: true,
+    },
+    walletAddress: {
         type: String,
         required: true,
     },

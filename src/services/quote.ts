@@ -1,5 +1,5 @@
 import { getQuote } from "../1inch/quoter/quoter";
-import { ARB_BITCOIN_CA, ARB_WETH_CA, POL_BITCOIN_CA, POL_WETH_CA, SupportedNetworks } from "../chains";
+import { ARB_WETH_CA, POL_BITCOIN_CA, SupportedNetworks } from "../chains";
 import { Quote, QuoteModel } from "../models/Quote";
 
 export class QuoteService {
@@ -14,11 +14,11 @@ export class QuoteService {
         if (dstChainId === SupportedNetworks.BITCOIN || dstChainId === SupportedNetworks.BITCOIN_TESTNET) {
             finalSrcChainId = SupportedNetworks.ARBITRUM;
             finalDstChainId = SupportedNetworks.POLYGON;
-            finalSrcTokenAddress = ARB_BITCOIN_CA;
-            finalDstTokenAddress = POL_WETH_CA;
+            finalSrcTokenAddress = ARB_WETH_CA;
+            finalDstTokenAddress = POL_BITCOIN_CA;
         }
         const quoteResponse = await getQuote(finalSrcChainId, finalDstChainId, finalSrcTokenAddress, finalDstTokenAddress, amount, walletAddress);
-        const quote = new QuoteModel({ srcChainId, dstChainId, srcTokenAddress, dstTokenAddress, srcTokenAmount: quoteResponse.srcTokenAmount, dstTokenAmount: quoteResponse.dstTokenAmount })
+        const quote = new QuoteModel({ srcChainId, dstChainId, srcTokenAddress, dstTokenAddress, srcTokenAmount: quoteResponse.srcTokenAmount, dstTokenAmount: quoteResponse.dstTokenAmount, walletAddress })
         if (enableEstimate) {
             return await quote.save();
         }
