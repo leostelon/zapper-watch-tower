@@ -14,6 +14,10 @@ contract Resolver is Ownable {
         _FACTORY = factory;
     }
 
+    function deploySrc(address _tokenAddress, bytes20 _secretHash, uint _amount) external onlyOwner returns (address) {
+        return _FACTORY.createSrcEscrow(msg.sender, _tokenAddress, _secretHash, _amount);
+    }
+
     function deployDst(address _tokenAddress, bytes20 _secretHash, uint _amount) external onlyOwner returns (address) {
         IERC20(_tokenAddress).approve(address(_FACTORY), _amount);
         return _FACTORY.createDstEscrow(_tokenAddress, _secretHash, _amount);
