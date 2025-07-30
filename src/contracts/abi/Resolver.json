@@ -100,6 +100,30 @@
             "type": "function"
         },
         {
+            "inputs": [
+                {
+                    "internalType": "address",
+                    "name": "_tokenAddress",
+                    "type": "address"
+                },
+                {
+                    "internalType": "bytes20",
+                    "name": "_secretHash",
+                    "type": "bytes20"
+                }
+            ],
+            "name": "precomputeAddress",
+            "outputs": [
+                {
+                    "internalType": "address",
+                    "name": "",
+                    "type": "address"
+                }
+            ],
+            "stateMutability": "view",
+            "type": "function"
+        },
+        {
             "inputs": [],
             "name": "renounceOwnership",
             "outputs": [],

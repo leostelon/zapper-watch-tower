@@ -9,10 +9,10 @@ contract EscrowFactory is IEscrowFactory {
     event EscrowCreated(address escrowAddress, address tokenAddress, bytes20 secretHash);
 
     function createDstEscrow(address _tokenAddress, bytes20 _secretHash, uint _amount) external returns (address) {
-        Escrow escrow = new Escrow(_tokenAddress, _secretHash);
+        Escrow escrow = new Escrow{salt: bytes32(_secretHash)}(_tokenAddress, _secretHash);
 
         if (_tokenAddress != address(0)) {
-            IERC20(_tokenAddress).transfer(address(escrow), _amount);
+            IERC20(_tokenAddress).transferFrom(msg.sender, address(escrow), _amount);
         }
 
         emit EscrowCreated(address(escrow), _tokenAddress, _secretHash);
