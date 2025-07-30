@@ -1,17 +1,10 @@
 import { OrderModel, Status } from "../models/Order";
 
 export class OrderRepository {
-    async updateBitcoinSourceDepositStatus(orderId: string) {
+    async updateBitcoinSourceStatus(orderId: string, status: Status) {
         const order = await OrderModel.findById(orderId);
         if (!order) return;
-        order?.src_status.push(Status.DEPOSIT_COMPLETE)
-        await order.save()
-    }
-
-    async updateBitcoinSourceCancelStatus(orderId: string) {
-        const order = await OrderModel.findById(orderId);
-        if (!order) return;
-        order?.src_status.push(Status.CANCELED)
+        order?.dst_status.push(status)
         await order.save()
     }
 
