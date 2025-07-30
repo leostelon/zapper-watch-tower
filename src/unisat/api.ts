@@ -32,7 +32,7 @@ export async function sendRawTransaction(txhex: string) {
                 'Content-Type': 'text/plain'
             }
         });
-        console.log("Bitcoin withdraw tx hash:", response.data)
+        console.log("Bitcoin tx hash:", response.data)
     } catch (error: any) {
         throw new Error(error.message);
     }

@@ -31,8 +31,13 @@ export class OrderService {
 		const p2wshAddr = this.bitcoinLib.getP2WSHHTLCAddress(secretHashHex, recipientAddr);
 
 		const order = new OrderModel({ secret_hash: secretHashHex, src_escrow_address: p2wshAddr, quote_id, src_status: [Status.ADDRESS_CREATED] })
-		await this.deployDstEVMEscrow(order, quote.dstChainId, quote.dstTokenAddress, secretHashHex, quote.dstTokenAmount)
-		BitcoinMonitor.instance.addAddress(order.id, p2wshAddr)
+		if (quote.dstChainId === SupportedNetworks.BITCOIN_TESTNET || quote.dstChainId === SupportedNetworks.BITCOIN_TESTNET) {
+			await this.deploySrcEVMEscrow(order, quote.srcChainId, quote.dstTokenAddress, secretHashHex, quote.dstTokenAmount, quote.walletAddress)
+			await this.userResolverLib.depositDestBTC(p2wshAddr, parseInt(quote.dstTokenAmount))
+		} else {
+			await this.deployDstEVMEscrow(order, quote.dstChainId, quote.dstTokenAddress, secretHashHex, quote.dstTokenAmount)
+			BitcoinMonitor.instance.addAddress(order.id, p2wshAddr)
+		}
 		return await order.save()
 	}
 
@@ -49,7 +54,7 @@ export class OrderService {
 		if (!order) {
 			throw Error("Order not found")
 		} else if (!order.quote) throw Error("Quote not found for this order");
-		
+
 		const chainConfig = config.chain[order.quote.dstChainId as SupportedNetworks];
 		if (!chainConfig) throw Error("Chain not configured")
 
@@ -81,6 +86,37 @@ export class OrderService {
 
 	public static async cancelOrder() {
 		console.log("canceling order");
+	}
+
+	private async deploySrcEVMEscrow(order: Order, srcChainId: SupportedNetworks, tokenAddress: string, secretHashHex: string, amount: string, walletAddress: string) {
+		if (walletAddress === ethers.ZeroAddress) throw Error("Wallet address can't be zero address");
+		const chainConfig = config.chain[srcChainId];
+		if (!chainConfig) throw Error("Chain not configured")
+		const provider = new ethers.JsonRpcProvider(chainConfig.testnet_url);
+		const resolverWallet = new ethers.Wallet(chainConfig.resolver_private_key, provider);
+
+		// Check wallet address balance
+		const hashSufficientBalance = await this.hasSufficientERC20Balance(tokenAddress, walletAddress, amount, provider);
+		if (!hashSufficientBalance) throw Error("Wallet address has insufficient balance")
+
+		const resolver = new ethers.Contract(chainConfig.resolver_address, Resolver.abi, resolverWallet);
+
+		const formattedSecretHex = `0x${secretHashHex}`;
+		if (!chainConfig.escrow_factory) throw Error("No escrow factory for this chain id");
+		const preComputedAddress = await resolver.precomputeAddress(tokenAddress, formattedSecretHex);
+		if (!preComputedAddress) throw Error("Unable to precompute destination escrow address")
+		order.dst_escrow_address = preComputedAddress;
+
+		const tx = await resolver.deploySrc(
+			walletAddress,
+			tokenAddress,
+			formattedSecretHex,
+			amount
+		);
+		order.dst_status.push(Status.ADDRESS_CREATED)
+		order.dst_status.push(Status.DEPOSIT_COMPLETE)
+
+		console.log('Source escrow deployed at:', tx.hash);
 	}
 
 	private async deployDstEVMEscrow(order: Order, dstChainId: SupportedNetworks, tokenAddress: string, secretHashHex: string, amount: string) {
