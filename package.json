@@ -27,8 +27,11 @@
     "bitcoinjs-lib": "^6.1.7",
     "cron": "^4.3.2",
     "dotenv": "^17.2.1",
+    "ecpair": "^2.1.0",
     "express": "^5.1.0",
     "mongoose": "^8.16.5",
+    "tiny-secp256k1": "^2.2.1",
+    "varuint-bitcoin": "^1.1.2",
     "zod": "^4.0.10"
   }
 }

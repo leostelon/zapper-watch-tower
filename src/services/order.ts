@@ -1,5 +1,4 @@
-import { script, opcodes, payments } from "bitcoinjs-lib";
-import { NETWORK } from "../constants";
+import { networks, Network, crypto } from "bitcoinjs-lib";
 import { Order, OrderModel, Status } from "../models/Order";
 import { QuoteModel } from "../models/Quote";
 import { BitcoinMonitor } from "../unisat";
@@ -10,22 +9,26 @@ import { config } from "../config";
 import { SupportedNetworks } from "../chains";
 import { OrderRepository } from "../repositories";
 import { BitcoinLib } from "../lib/bitcoin";
+import { UserResolverLib } from "../lib/userResolver";
 
 export class OrderService {
 	private bitcoinLib: BitcoinLib;
+	private userResolverLib: UserResolverLib;
+	private network: Network;
+
 	constructor() {
 		this.bitcoinLib = new BitcoinLib()
+		this.userResolverLib = new UserResolverLib();
+		this.network = networks.testnet;
 	}
 
 	public async createOrder(secretHashHex: string, quote_id: string): Promise<Order> {
 		const quote = await QuoteModel.findById(quote_id)
 		if (!quote) throw Error("No quote found");
 
-		const chainConfig = config.chain[quote.dstChainId as SupportedNetworks];
-		if (!chainConfig || !chainConfig.resolver_btc_address) {
-			throw new Error(`resolver_btc_address missing for chain ID: ${quote.dstChainId}`);
-		}
-		const p2wshAddr = this.bitcoinLib.getP2WSHAddress(secretHashHex, chainConfig.resolver_btc_address);
+		const userResolverBtcKeypair = this.userResolverLib.getBTCKeypair(this.network);
+		const recipientAddr = crypto.hash160(userResolverBtcKeypair.publicKey)
+		const p2wshAddr = this.bitcoinLib.getP2WSHHTLCAddress(secretHashHex, recipientAddr);
 
 		const order = new OrderModel({ secret_hash: secretHashHex, src_escrow_address: p2wshAddr, quote_id, src_status: [Status.ADDRESS_CREATED] })
 		await this.deployDstEVMEscrow(order, quote.dstChainId, quote.dstTokenAddress, secretHashHex, quote.dstTokenAmount)
@@ -38,6 +41,41 @@ export class OrderService {
 		if (!order) {
 			throw Error("Order not found")
 		}
+		return order
+	}
+
+	public async redeemOrder(orderId: string, secret: string, withdraw_to: string): Promise<Order> {
+		const order = await OrderModel.findById(orderId).populate("quote")
+		if (!order) {
+			throw Error("Order not found")
+		} else if (!order.quote) throw Error("Quote not found for this order");
+		
+		const chainConfig = config.chain[order.quote.dstChainId as SupportedNetworks];
+		if (!chainConfig) throw Error("Chain not configured")
+
+		const provider = new ethers.JsonRpcProvider(chainConfig.testnet_url);
+		const wallet = new ethers.Wallet(chainConfig.resolver_private_key!, provider);
+
+		const resolver = new ethers.Contract(chainConfig.resolver_address, Resolver.abi, wallet);
+		if (!order.dst_escrow_address) throw Error("Destination escrow not found this order");
+
+		// TODO: check for src deposit
+
+		// Withdraw from EVM
+		const tx = await resolver.withdraw(
+			order.dst_escrow_address,
+			secret,
+			withdraw_to
+		);
+		const orderRepo = new OrderRepository();
+		await orderRepo.updateBitcoinDestinationStatus(orderId, Status.WITHDRAWN);
+
+		if (!order.src_escrow_address) throw Error("Source escrow address not found.")
+		// Withdraw from Bitcoin
+		await this.bitcoinLib.submitTransaction(secret, order.src_escrow_address);
+		await orderRepo.updateBitcoinSourceStatus(orderId, Status.WITHDRAWN);
+
+		console.log('Funds withdrawn from dest at tx:', tx.hash);
 		return order
 	}
 
@@ -71,7 +109,6 @@ export class OrderService {
 		order.dst_status.push(Status.ADDRESS_CREATED)
 		order.dst_status.push(Status.DEPOSIT_COMPLETE)
 
-		await tx.wait();
 		console.log('Destination escrow deployed at:', tx.hash);
 	}
 
