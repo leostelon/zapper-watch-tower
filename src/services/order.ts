@@ -30,11 +30,13 @@ export class OrderService {
 		const recipientAddr = crypto.hash160(userResolverBtcKeypair.publicKey)
 		const p2wshAddr = this.bitcoinLib.getP2WSHHTLCAddress(secretHashHex, recipientAddr);
 
-		const order = new OrderModel({ secret_hash: secretHashHex, src_escrow_address: p2wshAddr, quote_id, src_status: [Status.ADDRESS_CREATED] })
+		const order = new OrderModel({ secret_hash: secretHashHex, quote_id, src_status: [Status.ADDRESS_CREATED] })
 		if (quote.dstChainId === SupportedNetworks.BITCOIN_TESTNET || quote.dstChainId === SupportedNetworks.BITCOIN_TESTNET) {
+			order.dst_escrow_address = p2wshAddr;
 			await this.deploySrcEVMEscrow(order, quote.srcChainId, quote.dstTokenAddress, secretHashHex, quote.dstTokenAmount, quote.walletAddress)
 			await this.userResolverLib.depositDestBTC(p2wshAddr, parseInt(quote.dstTokenAmount))
 		} else {
+			order.src_escrow_address = p2wshAddr;
 			await this.deployDstEVMEscrow(order, quote.dstChainId, quote.dstTokenAddress, secretHashHex, quote.dstTokenAmount)
 			BitcoinMonitor.instance.addAddress(order.id, p2wshAddr)
 		}
@@ -54,30 +56,40 @@ export class OrderService {
 		if (!order) {
 			throw Error("Order not found")
 		} else if (!order.quote) throw Error("Quote not found for this order");
+		
+		let evmEscrowAddress = order.dst_escrow_address;
+		let btcEscrowAddress = order.src_escrow_address;
+		let evmChainId = order.quote.dstChainId;
+		let evmWithdrawalAddress = withdraw_to;
+		if (order.quote.dstChainId === SupportedNetworks.BITCOIN_TESTNET || order.quote.dstChainId === SupportedNetworks.BITCOIN_TESTNET) {
+			evmEscrowAddress = order.src_escrow_address;
+			btcEscrowAddress = order.dst_escrow_address;
+			evmChainId = order.quote.srcChainId;
+			evmWithdrawalAddress = this.userResolverLib.resolverEVMAddress;
+		}
+		if (!evmEscrowAddress) throw Error("EVM escrow not found this order");
+		if (!btcEscrowAddress) throw Error("Source escrow address not found.")
 
-		const chainConfig = config.chain[order.quote.dstChainId as SupportedNetworks];
+		const chainConfig = config.chain[evmChainId as SupportedNetworks];
 		if (!chainConfig) throw Error("Chain not configured")
 
 		const provider = new ethers.JsonRpcProvider(chainConfig.testnet_url);
 		const wallet = new ethers.Wallet(chainConfig.resolver_private_key!, provider);
 
 		const resolver = new ethers.Contract(chainConfig.resolver_address, Resolver.abi, wallet);
-		if (!order.dst_escrow_address) throw Error("Destination escrow not found this order");
-
 		// TODO: check for src deposit
 
 		// Withdraw from EVM
 		const tx = await resolver.withdraw(
-			order.dst_escrow_address,
+			evmEscrowAddress,
 			secret,
-			withdraw_to
+			evmWithdrawalAddress
 		);
 		const orderRepo = new OrderRepository();
 		await orderRepo.updateBitcoinDestinationStatus(orderId, Status.WITHDRAWN);
 
-		if (!order.src_escrow_address) throw Error("Source escrow address not found.")
 		// Withdraw from Bitcoin
-		await this.bitcoinLib.submitTransaction(secret, order.src_escrow_address);
+		await this.bitcoinLib.submitTransaction(secret, btcEscrowAddress);
 		await orderRepo.updateBitcoinSourceStatus(orderId, Status.WITHDRAWN);
 
 		console.log('Funds withdrawn from dest at tx:', tx.hash);
@@ -105,7 +117,7 @@ export class OrderService {
 		if (!chainConfig.escrow_factory) throw Error("No escrow factory for this chain id");
 		const preComputedAddress = await resolver.precomputeAddress(tokenAddress, formattedSecretHex);
 		if (!preComputedAddress) throw Error("Unable to precompute destination escrow address")
-		order.dst_escrow_address = preComputedAddress;
+		order.src_escrow_address = preComputedAddress;
 
 		const tx = await resolver.deploySrc(
 			walletAddress,

@@ -25,6 +25,7 @@ export const config: {
 
 export const userResolverConfig = {
     btc_address: "tb1q8t4dstk53dw4dw82uajl292x2kjzwwdfa47qk6",
+    evm_address: "0x3b18dCa02FA6945aCBbE2732D8942781B410E0F9",
     btc_key_wif: RESOLVER_BTC_PVT_KEY_WIF
 }
 

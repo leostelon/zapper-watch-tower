@@ -7,12 +7,14 @@ import { NETWORK } from "../constants";
 const ECPair = ECPairFactory(tinysecp);
 
 export class UserResolverLib {
-    public readonly resolverBTCAddress;
+    public readonly resolverBTCAddress: string;
+    public readonly resolverEVMAddress: string;
     public readonly resolverBTCKeyWIF: string;
 
     constructor() {
         this.resolverBTCAddress = userResolverConfig.btc_address;
         this.resolverBTCKeyWIF = userResolverConfig.btc_key_wif;
+        this.resolverEVMAddress = userResolverConfig.evm_address;
     }
 
     public async depositDestBTC(destinationAddress: string, sendAmount: number) {
