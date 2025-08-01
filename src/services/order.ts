@@ -33,7 +33,7 @@ export class OrderService {
 		const order = new OrderModel({ secret_hash: secretHashHex, quote_id, src_status: [Status.ADDRESS_CREATED] })
 		if (quote.dstChainId === SupportedNetworks.BITCOIN_TESTNET || quote.dstChainId === SupportedNetworks.BITCOIN_TESTNET) {
 			order.dst_escrow_address = p2wshAddr;
-			await this.deploySrcEVMEscrow(order, quote.srcChainId, quote.dstTokenAddress, secretHashHex, quote.dstTokenAmount, quote.walletAddress)
+			await this.deploySrcEVMEscrow(order, quote.srcChainId, quote.srcTokenAddress, secretHashHex, quote.srcTokenAmount, quote.walletAddress)
 			await this.userResolverLib.depositDestBTC(p2wshAddr, parseInt(quote.dstTokenAmount))
 		} else {
 			order.src_escrow_address = p2wshAddr;
@@ -51,12 +51,34 @@ export class OrderService {
 		return order
 	}
 
+	public async getOrders(walletAddress: string): Promise<Order[]> {
+		const orders = await OrderModel.aggregate([
+			{
+				$lookup: {
+					from: "quotes",
+					localField: "quote_id",
+					foreignField: "_id",
+					as: "quote"
+				}
+			},
+			{
+				$unwind: "$quote"
+			},
+			{
+				$match: {
+					"quote.walletAddress": walletAddress
+				}
+			}
+		]);
+		return orders
+	}
+
 	public async redeemOrder(orderId: string, secret: string, withdraw_to: string): Promise<Order> {
 		const order = await OrderModel.findById(orderId).populate("quote")
 		if (!order) {
 			throw Error("Order not found")
 		} else if (!order.quote) throw Error("Quote not found for this order");
-		
+
 		let evmEscrowAddress = order.dst_escrow_address;
 		let btcEscrowAddress = order.src_escrow_address;
 		let evmChainId = order.quote.dstChainId;

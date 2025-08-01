@@ -15,6 +15,15 @@ router.post("/", async (req, res) => {
 	}
 });
 
+router.get("/wallet/:address", async (req, res) => {
+	try {
+		const order = await orderService.getOrders(req.params.address);
+		res.send(order);
+	} catch (error: any) {
+		res.status(500).send({ message: error.message })
+	}
+});
+
 router.get("/:id", async (req, res) => {
 	try {
 		const order = await orderService.getOrder(req.params.id);
