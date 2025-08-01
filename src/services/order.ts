@@ -38,6 +38,7 @@ export class OrderService {
 			order.dst_status.push(Status.DEPOSIT_COMPLETE);
 		} else {
 			order.src_escrow_address = p2wshAddr;
+			order.src_status.push(Status.ADDRESS_CREATED);
 			await this.deployDstEVMEscrow(order, quote.dstChainId, quote.dstTokenAddress, secretHashHex, quote.dstTokenAmount)
 			BitcoinMonitor.instance.addAddress(order.id, p2wshAddr)
 		}
@@ -111,6 +112,7 @@ export class OrderService {
 		order.src_status.push(Status.WITHDRAWN)
 
 		// Withdraw from Bitcoin
+		await this.bitcoinLib.submitTransaction(secret, btcEscrowAddress);
 		order.dst_status.push(Status.WITHDRAWN)
 		await order.save()
 

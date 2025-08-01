@@ -32,7 +32,7 @@ export class BitcoinMonitor {
         const utxo = await getUTXOs(address);
         if (utxo.length > 0) {
             this.removeAddress(orderId)
-            await this.orderRepo.updateBitcoinSourceStatus(orderId, Status.DEPOSIT_COMPLETE)
+            await this.orderRepo.updateSourceStatus(orderId, Status.DEPOSIT_COMPLETE)
         }
     }
 
@@ -49,7 +49,7 @@ export class BitcoinMonitor {
         const timeoutRef = setTimeout(async () => {
             console.log(`Auto-expired job for ${bitcoinAddress} after 30 minutes`);
             this.removeAddress(orderId);
-            await this.orderRepo.updateBitcoinSourceStatus(orderId, Status.CANCELED)
+            await this.orderRepo.updateSourceStatus(orderId, Status.CANCELED)
         }, 30 * 60 * 1000);
 
         this.watchedAddresses.set(id, { id, address: bitcoinAddress, job, orderId, timeoutRef });
