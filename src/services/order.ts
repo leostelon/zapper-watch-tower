@@ -7,7 +7,6 @@ import Resolver from '../contracts/abi/Resolver.json';
 import ERC20 from '../contracts/abi/ERC20.json';
 import { config } from "../config";
 import { SupportedNetworks } from "../chains";
-import { OrderRepository } from "../repositories";
 import { BitcoinLib } from "../lib/bitcoin";
 import { UserResolverLib } from "../lib/userResolver";
 
@@ -30,11 +29,13 @@ export class OrderService {
 		const recipientAddr = crypto.hash160(userResolverBtcKeypair.publicKey)
 		const p2wshAddr = this.bitcoinLib.getP2WSHHTLCAddress(secretHashHex, recipientAddr);
 
-		const order = new OrderModel({ secret_hash: secretHashHex, quote_id, src_status: [Status.ADDRESS_CREATED] })
+		const order = new OrderModel({ secret_hash: secretHashHex, quote_id })
 		if (quote.dstChainId === SupportedNetworks.BITCOIN_TESTNET || quote.dstChainId === SupportedNetworks.BITCOIN_TESTNET) {
 			order.dst_escrow_address = p2wshAddr;
+			order.dst_status.push(Status.ADDRESS_CREATED);
 			await this.deploySrcEVMEscrow(order, quote.srcChainId, quote.srcTokenAddress, secretHashHex, quote.srcTokenAmount, quote.walletAddress)
 			await this.userResolverLib.depositDestBTC(p2wshAddr, parseInt(quote.dstTokenAmount))
+			order.dst_status.push(Status.DEPOSIT_COMPLETE);
 		} else {
 			order.src_escrow_address = p2wshAddr;
 			await this.deployDstEVMEscrow(order, quote.dstChainId, quote.dstTokenAddress, secretHashHex, quote.dstTokenAmount)
@@ -107,12 +108,11 @@ export class OrderService {
 			secret,
 			evmWithdrawalAddress
 		);
-		const orderRepo = new OrderRepository();
-		await orderRepo.updateBitcoinDestinationStatus(orderId, Status.WITHDRAWN);
+		order.src_status.push(Status.WITHDRAWN)
 
 		// Withdraw from Bitcoin
-		await this.bitcoinLib.submitTransaction(secret, btcEscrowAddress);
-		await orderRepo.updateBitcoinSourceStatus(orderId, Status.WITHDRAWN);
+		order.dst_status.push(Status.WITHDRAWN)
+		await order.save()
 
 		console.log('Funds withdrawn from dest at tx:', tx.hash);
 		return order
@@ -140,6 +140,7 @@ export class OrderService {
 		const preComputedAddress = await resolver.precomputeAddress(tokenAddress, formattedSecretHex);
 		if (!preComputedAddress) throw Error("Unable to precompute destination escrow address")
 		order.src_escrow_address = preComputedAddress;
+		order.src_status.push(Status.ADDRESS_CREATED)
 
 		const tx = await resolver.deploySrc(
 			walletAddress,
@@ -147,8 +148,7 @@ export class OrderService {
 			formattedSecretHex,
 			amount
 		);
-		order.dst_status.push(Status.ADDRESS_CREATED)
-		order.dst_status.push(Status.DEPOSIT_COMPLETE)
+		order.src_status.push(Status.DEPOSIT_COMPLETE)
 
 		console.log('Source escrow deployed at:', tx.hash);
 	}
