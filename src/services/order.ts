@@ -81,6 +81,10 @@ export class OrderService {
 			throw Error("Order not found")
 		} else if (!order.quote) throw Error("Quote not found for this order");
 
+		if (order.dst_status.includes(Status.WITHDRAWN) && order.src_status.includes(Status.WITHDRAWN)) {
+			throw Error("Order completed.")
+		}
+
 		let evmEscrowAddress = order.dst_escrow_address;
 		let btcEscrowAddress = order.src_escrow_address;
 		let evmChainId = order.quote.dstChainId;
@@ -150,6 +154,7 @@ export class OrderService {
 			formattedSecretHex,
 			amount
 		);
+		await tx.wait()
 		order.src_status.push(Status.DEPOSIT_COMPLETE)
 
 		console.log('Source escrow deployed at:', tx.hash);
@@ -172,13 +177,14 @@ export class OrderService {
 		const preComputedAddress = await resolver.precomputeAddress(tokenAddress, formattedSecretHex);
 		if (!preComputedAddress) throw Error("Unable to precompute destination escrow address")
 		order.dst_escrow_address = preComputedAddress;
+		order.dst_status.push(Status.ADDRESS_CREATED)
 
 		const tx = await resolver.deployDst(
 			tokenAddress,
 			formattedSecretHex,
 			amount
 		);
-		order.dst_status.push(Status.ADDRESS_CREATED)
+		await tx.wait()
 		order.dst_status.push(Status.DEPOSIT_COMPLETE)
 
 		console.log('Destination escrow deployed at:', tx.hash);
