@@ -70,6 +70,11 @@ export class OrderService {
 				$match: {
 					"quote.walletAddress": walletAddress
 				}
+			},
+			{
+				$sort: {
+					createdAt: -1
+				}
 			}
 		]);
 		return orders
