@@ -97,6 +97,15 @@ export class BitcoinLib {
 
     private getLockingScriptBuffer(hash: Buffer, recipientAddress: Buffer) {
         const locking_script = script.compile([
+            opcodes.OP_IF,
+            opcodes.OP_1,
+            opcodes.OP_CHECKSEQUENCEVERIFY, //Even one block takes long on testnet4; current relayer skips the IF script for demo purposes.
+            opcodes.OP_DROP,
+            opcodes.OP_DUP,
+            opcodes.OP_HASH160,
+            recipientAddress,
+            opcodes.OP_EQUALVERIFY,
+            opcodes.OP_ELSE,
             opcodes.OP_HASH160,
             hash,
             opcodes.OP_EQUALVERIFY,
